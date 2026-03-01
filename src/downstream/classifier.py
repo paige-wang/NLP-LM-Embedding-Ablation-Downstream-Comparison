@@ -16,7 +16,12 @@ class IntentClassifier(nn.Module):
     def forward(self, input_ids: Tensor) -> Tensor:
         # input_ids: [B, T]
         hidden = self.lm.encode(input_ids)  # [B, T, D]
-        pooled = hidden.mean(dim=1)  # [B, D]
+        # Masked mean pooling: exclude padding tokens from the mean.
+        pad_id = getattr(self.lm, "pad_id", 0)
+        mask = (input_ids != pad_id).unsqueeze(-1).to(hidden.dtype)  # [B, T, 1]
+        summed = (hidden * mask).sum(dim=1)  # [B, D]
+        lengths = mask.sum(dim=1).clamp(min=1)  # [B, 1]
+        pooled = summed / lengths  # [B, D]
         assert pooled.ndim == 2, f"Expected 2D pooled tensor, got {pooled.ndim}D"
         assert pooled.shape[-1] == self.classifier.in_features, (
             f"Expected feature dim {self.classifier.in_features}, got {pooled.shape[-1]}"

@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--max_steps", type=int, default=0)
+    parser.add_argument("--lr", type=float, default=None, help="Override learning rate (finetune mode)")
     return parser.parse_args()
 
 
@@ -64,6 +65,12 @@ def main() -> None:
     cfg.epochs = args.epochs
     cfg.batch_size = args.batch_size
     cfg.max_steps_per_epoch = args.max_steps
+    # If finetuning, default to a higher lr unless overridden by --lr
+    if args.mode == "finetune":
+        cfg.finetune_lr = args.lr if args.lr is not None else 1e-3
+    else:
+        if args.lr is not None:
+            cfg.frozen_lr = args.lr
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"downstream_{args.mode}_{timestamp}"
