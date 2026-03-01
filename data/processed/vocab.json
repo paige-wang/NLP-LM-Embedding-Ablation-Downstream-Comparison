@@ -1,0 +1,30 @@
+{
+  "max_size": 20000,
+  "token2id": {
+    "<pad>": 0,
+    "<unk>": 1,
+    "<bos>": 2,
+    "<eos>": 3,
+    "models": 4,
+    "language": 5,
+    "learn": 6,
+    "token": 7,
+    "distributions": 8,
+    "from": 9,
+    "text": 10,
+    "corpora.": 11,
+    "transformer": 12,
+    "use": 13,
+    "causal": 14,
+    "attention": 15,
+    "masks": 16,
+    "during": 17,
+    "training.": 18,
+    "recurrent": 19,
+    "include": 20,
+    "rnn": 21,
+    "and": 22,
+    "lstm": 23,
+    "architectures.": 24
+  }
+}

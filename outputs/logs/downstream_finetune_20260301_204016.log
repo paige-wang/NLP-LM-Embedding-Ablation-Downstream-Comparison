@@ -1,0 +1,2 @@
+2026-03-01 20:40:22 | INFO | epoch=1 mode=finetune train_loss=2.1394 val_acc=0.1429 val_macro_f1=0.0357 time=0.76s
+2026-03-01 20:40:23 | INFO | test mode=finetune acc=0.1429 macro_f1=0.0357 device=cpu

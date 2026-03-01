@@ -1,0 +1,4 @@
+2026-03-01 20:39:43 | INFO | ablation_run model=transformer embed=fixed_pretrained
+2026-03-01 20:39:48 | INFO | epoch=1 train_loss=3.2967 val_ppl=113.5460 time=0.52
+2026-03-01 20:39:48 | INFO | glove_coverage=0.0000
+2026-03-01 20:39:48 | INFO | best_val_ppl=113.5460 convergence_epoch=1
