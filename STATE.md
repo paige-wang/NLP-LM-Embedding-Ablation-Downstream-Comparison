@@ -20,6 +20,7 @@ Cross-references: [CLAUDE.md](CLAUDE.md) | [ARCHITECTURE.md](ARCHITECTURE.md) | 
 - [x] Implemented embedding ablation modules: trainable, fixed-self (Word2Vec), fixed-pretrained (GloVe)
 - [x] Implemented downstream modules: intent classifier and trainer
 - [x] Implemented scripts: `train_lm.py`, `ablation.py`, `downstream.py`
+- [x] Added one-click full-run script: `scripts/run_all_experiments.sh`
 - [x] Added experiment auto-logging to `outputs/EXPERIMENTS.md`
 - [x] Added checkpoint/log/figure output paths and generation
 - [x] Verified all required command paths via lightweight smoke runs
@@ -44,3 +45,4 @@ Cross-references: [CLAUDE.md](CLAUDE.md) | [ARCHITECTURE.md](ARCHITECTURE.md) | 
   - `https://github.com/paige-wang/NLP-LM-Embedding-Ablation-Downstream-Comparison.git`
 - Upload workflow validated:
   - `git push` succeeded for `main` (`9e22eda..646e18d`) after running outside sandbox network restrictions.
+- Full-run script executable bit prepared for Linux servers via Git index (`--chmod=+x`).
