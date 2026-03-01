@@ -38,3 +38,9 @@ Cross-references: [CLAUDE.md](CLAUDE.md) | [ARCHITECTURE.md](ARCHITECTURE.md) | 
 
 - Local validation used reduced settings (`epochs=1`, limited steps) to verify engineering correctness.
 - Offline fallback datasets are included so scripts remain runnable without network access.
+- Git commit completed locally on `main`:
+  - `646e18d feat: complete Phase 1 data pipeline, model architectures, and smoke tests`
+- Remote appears configured as:
+  - `https://github.com/paige-wang/NLP-LM-Embedding-Ablation-Downstream-Comparison.git`
+- Upload workflow validated:
+  - `git push` succeeded for `main` (`9e22eda..646e18d`) after running outside sandbox network restrictions.
