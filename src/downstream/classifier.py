@@ -7,7 +7,7 @@ from src.models.base_lm import BaseLanguageModel
 
 
 class IntentClassifier(nn.Module):
-    """Mean-pooling + linear classifier for SNIPS intent prediction."""
+    """Last-token pooling + linear classifier for SNIPS intent prediction."""
 
     def __init__(self, lm: BaseLanguageModel, embed_dim: int = 300, num_classes: int = 7) -> None:
         super().__init__()

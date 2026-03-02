@@ -6,3 +6,5 @@
 | transformer_fixed_pretrained_20260301_203943 | 1 | fixed_pretrained | transformer | 113.5460 | 1 | 2026-03-01 20:39:48 |
 | downstream_frozen_20260301_204016 | 1 | frozen | 0.1429 | 0.0357 | 2026-03-01 20:40:21 |
 | downstream_finetune_20260301_204016 | 1 | finetune | 0.1429 | 0.0357 | 2026-03-01 20:40:22 |
+| downstream_finetune_20260302_141710 | 1 | finetune | 0.1409 | 0.0353 | 2026-03-02 14:17:35 |
+| downstream_finetune_20260302_141815 | 1 | finetune | 0.1417 | 0.0355 | 2026-03-02 14:18:39 |

@@ -1,5 +1,6 @@
 """Dataset loading and preprocessing helpers."""
 
+import csv
 from pathlib import Path
 
 from datasets import load_dataset
@@ -8,6 +9,8 @@ import numpy as np
 from src.data.downstream_dataset import SNIPSExample, parse_snips_split
 from src.data.tokenizer import SimpleTokenizer
 from src.data.vocabulary import Vocabulary
+
+SNIPS_DATA_DIR = Path("data/snips")
 
 
 def _fallback_wikitext() -> dict[str, list[str]]:
@@ -112,15 +115,84 @@ def _fallback_snips() -> dict[str, list[SNIPSExample]]:
     return {"train": examples * 4, "validation": examples, "test": examples, "labels": label_names}
 
 
+def _load_snips_label_names() -> list[str]:
+    """Read label names from data/snips/labels.txt, falling back to hardcoded list."""
+    labels_path = SNIPS_DATA_DIR / "labels.txt"
+    if labels_path.exists():
+        names = [ln.strip() for ln in labels_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        if names:
+            return names
+    return [
+        "AddToPlaylist", "BookRestaurant", "GetWeather",
+        "PlayMusic", "RateBook", "SearchCreativeWork", "SearchScreeningEvent",
+    ]
+
+
+def _load_snips_csv(split_file: Path) -> list[SNIPSExample]:
+    """Load a SNIPS split from a local CSV file (columns: text, label)."""
+    examples: list[SNIPSExample] = []
+    with open(split_file, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            text = row.get("text", "").strip()
+            label = int(row["label"])
+            examples.append(SNIPSExample(text=text, label=label))
+    return examples
+
+
+def _load_snips_from_local_csv() -> dict[str, list[SNIPSExample] | list[str]] | None:
+    """Try loading all three SNIPS splits from local CSV files in data/snips/.
+
+    Returns None if the directory or any required file is missing.
+    """
+    required = {
+        "train": SNIPS_DATA_DIR / "train.csv",
+        "validation": SNIPS_DATA_DIR / "val.csv",
+        "test": SNIPS_DATA_DIR / "test.csv",
+    }
+    if not all(p.exists() for p in required.values()):
+        return None
+    return {
+        "train": _load_snips_csv(required["train"]),
+        "validation": _load_snips_csv(required["validation"]),
+        "test": _load_snips_csv(required["test"]),
+        "labels": _load_snips_label_names(),
+    }
+
+
 def load_snips_splits() -> dict[str, list[SNIPSExample] | list[str]]:
-    """Load SNIPS splits with fallback."""
+    """Load SNIPS splits: local CSV → HuggingFace → synthetic fallback."""
+    # 1. Try local CSV files (fastest, no network)
+    local = _load_snips_from_local_csv()
+    if local is not None:
+        return local
+
+    # 2. Try HuggingFace (DeepPavlov/snips has 'utterance'+'label' columns)
     try:
         dataset = load_dataset("DeepPavlov/snips")
+        label_names = _load_snips_label_names()
+
+        def _parse_hf(split):
+            examples = []
+            for row in split:
+                text = row.get("utterance", row.get("text", "")).strip()
+                label_val = row.get("label", row.get("intent", 0))
+                label = int(label_val) if isinstance(label_val, int) else 0
+                examples.append(SNIPSExample(text=text, label=label))
+            return examples
+
+        train_split = dataset["train"]
+        test_split = dataset["test"]
+        # HF version has no validation split — use last 10 % of train
+        cut = max(1, int(len(train_split) * 0.9))
         return {
-            "train": parse_snips_split(dataset["train"]),
-            "validation": parse_snips_split(dataset["validation"]),
-            "test": parse_snips_split(dataset["test"]),
-            "labels": list(dataset["train"].features["intent"].names),
+            "train": _parse_hf(train_split.select(range(cut))),
+            "validation": _parse_hf(train_split.select(range(cut, len(train_split)))),
+            "test": _parse_hf(test_split),
+            "labels": label_names,
         }
     except Exception:
-        return _fallback_snips()
+        pass
+
+    # 3. Tiny synthetic fallback
+    return _fallback_snips()
