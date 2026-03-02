@@ -49,8 +49,20 @@ def build_or_load_vocab_and_ids(
     data_dir: str,
     vocab_size: int,
     tokenizer: SimpleTokenizer,
+    supplement_texts: list[list[str]] | None = None,
+    force: bool = False,
 ) -> tuple[Vocabulary, dict[str, np.ndarray], list[list[str]]]:
-    """Build/load vocabulary and token-id arrays for LM training."""
+    """Build/load vocabulary and token-id arrays for LM training.
+
+    Args:
+        data_dir: Directory for processed data cache.
+        vocab_size: Maximum vocabulary size.
+        tokenizer: Tokenizer instance.
+        supplement_texts: Extra tokenized sequences (e.g. from SNIPS) added to
+            the vocab AFTER the main WikiText-2 build.  They do NOT affect the
+            token-id .npy arrays, only the vocabulary coverage.
+        force: If True, delete cached vocab/ids and rebuild from scratch.
+    """
     processed_dir = Path(data_dir)
     processed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -61,8 +73,16 @@ def build_or_load_vocab_and_ids(
         "test": processed_dir / "test_ids.npy",
     }
 
+    if force:
+        for p in [vocab_path, *split_paths.values()]:
+            p.unlink(missing_ok=True)
+
     if vocab_path.exists() and all(path.exists() for path in split_paths.values()):
         vocab = Vocabulary.load(str(vocab_path))
+        # If supplement tokens were requested, augment in-place (no rebuild needed)
+        if supplement_texts:
+            vocab.build(supplement_texts)
+            vocab.save(str(vocab_path))
         split_ids = {name: np.load(path) for name, path in split_paths.items()}
         return vocab, split_ids, []
 
@@ -80,6 +100,8 @@ def build_or_load_vocab_and_ids(
 
     vocab = Vocabulary(max_size=vocab_size)
     vocab.build(token_splits["train"])
+    if supplement_texts:
+        vocab.build(supplement_texts)
     vocab.save(str(vocab_path))
 
     split_ids: dict[str, np.ndarray] = {}

@@ -8,3 +8,5 @@
 | downstream_finetune_20260301_204016 | 1 | finetune | 0.1429 | 0.0357 | 2026-03-01 20:40:22 |
 | downstream_finetune_20260302_141710 | 1 | finetune | 0.1409 | 0.0353 | 2026-03-02 14:17:35 |
 | downstream_finetune_20260302_141815 | 1 | finetune | 0.1417 | 0.0355 | 2026-03-02 14:18:39 |
+| downstream_finetune_20260302_145738 | 1 | finetune | 0.1493 | 0.0835 | 2026-03-02 14:58:38 |
+| downstream_finetune_20260302_145738 | 2 | finetune | 0.1309 | 0.1020 | 2026-03-02 14:58:59 |

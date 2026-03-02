@@ -68,12 +68,15 @@ class DownstreamConfig:
 
     frozen_lr: float = 1e-3
     finetune_lr: float = 5e-5
+    head_lr_multiplier: float = 10.0   # classifier head LR = finetune_lr * multiplier
     batch_size: int = 32
     epochs: int = 10
     grad_clip: float = 1.0
     dropout: float = 0.1
     num_workers: int = 0
     max_steps_per_epoch: int = 0
+    warmup_steps: int = 200
+    early_stopping_patience: int = 5
 
     checkpoint_dir: str = "outputs/checkpoints"
     log_dir: str = "outputs/logs"

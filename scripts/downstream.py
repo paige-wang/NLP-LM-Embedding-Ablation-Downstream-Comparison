@@ -29,10 +29,30 @@ from src.utils.seed import set_seed
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["frozen", "finetune"], required=True)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--max_steps", type=int, default=0)
-    parser.add_argument("--lr", type=float, default=None, help="Override learning rate (finetune mode)")
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=None,
+        help="Override backbone LR (finetune: default 5e-5; frozen: default 1e-3)",
+    )
+    parser.add_argument(
+        "--ckpt_path",
+        type=str,
+        default=None,
+        help="Path to a pretrained LM .pt checkpoint to warm-start the backbone.",
+    )
+    parser.add_argument(
+        "--rebuild_vocab",
+        action="store_true",
+        help=(
+            "Force delete cached vocab.json and token-id arrays, then rebuild "
+            "from WikiText-2 + SNIPS training data.  Use this when the cached "
+            "vocab is tiny (e.g. built from the fallback corpus)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -43,7 +63,9 @@ def resolve_device(device_name: str) -> torch.device:
 
 
 def build_backbone(vocab_size: int, pad_id: int, lm_cfg: LMConfig) -> TransformerLanguageModel:
-    embedding = TrainableEmbedding(vocab_size=vocab_size, embedding_dim=lm_cfg.embed_dim, pad_id=pad_id)
+    embedding = TrainableEmbedding(
+        vocab_size=vocab_size, embedding_dim=lm_cfg.embed_dim, pad_id=pad_id
+    )
     model = TransformerLanguageModel(
         vocab_size=vocab_size,
         embedding=embedding,
@@ -57,17 +79,46 @@ def build_backbone(vocab_size: int, pad_id: int, lm_cfg: LMConfig) -> Transforme
     return model
 
 
+def load_checkpoint(model: TransformerLanguageModel, ckpt_path: str, logger) -> None:
+    """Load a pretrained LM checkpoint into the backbone.
+
+    Uses strict=False so that size-mismatched keys (embedding / lm_head when
+    vocab changed) are skipped gracefully.
+    """
+    path = Path(ckpt_path)
+    if not path.exists():
+        logger.warning("Checkpoint not found at %s — starting from random init.", ckpt_path)
+        return
+    state = torch.load(path, map_location="cpu")
+    # Unwrap nested dicts produced by some save conventions
+    if "model_state_dict" in state:
+        state = state["model_state_dict"]
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    loaded = set(state.keys()) - set(missing)
+    logger.info(
+        "Loaded checkpoint %s  matched=%d  missing=%d  unexpected=%d",
+        ckpt_path,
+        len(loaded),
+        len(missing),
+        len(unexpected),
+    )
+
+
 def main() -> None:
     args = parse_args()
     cfg = DownstreamConfig()
     lm_cfg = LMConfig()
     set_seed(cfg.seed)
+
     cfg.epochs = args.epochs
     cfg.batch_size = args.batch_size
     cfg.max_steps_per_epoch = args.max_steps
-    # If finetuning, default to a higher lr unless overridden by --lr
+
+    # Apply LR overrides (never silently override to 1e-3)
     if args.mode == "finetune":
-        cfg.finetune_lr = args.lr if args.lr is not None else 1e-3
+        if args.lr is not None:
+            cfg.finetune_lr = args.lr
+        # else keep config default: 5e-5
     else:
         if args.lr is not None:
             cfg.frozen_lr = args.lr
@@ -76,27 +127,68 @@ def main() -> None:
     run_name = f"downstream_{args.mode}_{timestamp}"
     logger = get_logger(run_name, cfg.log_dir)
 
+    logger.info(
+        "mode=%s  epochs=%d  batch_size=%d  finetune_lr=%.2e  frozen_lr=%.2e",
+        args.mode,
+        cfg.epochs,
+        cfg.batch_size,
+        cfg.finetune_lr,
+        cfg.frozen_lr,
+    )
+
     tokenizer = SimpleTokenizer()
-    vocab, _, _ = build_or_load_vocab_and_ids(lm_cfg.data_dir, lm_cfg.vocab_size, tokenizer)
+
+    # ── Load SNIPS splits first so we can augment the vocab ──────────────────
     snips = load_snips_splits()
-    class_names = snips["labels"]  # type: ignore[assignment]
-    train_ds = SNIPSDataset(snips["train"], vocab=vocab, seq_len=cfg.seq_len)  # type: ignore[arg-type]
-    val_ds = SNIPSDataset(snips["validation"], vocab=vocab, seq_len=cfg.seq_len)  # type: ignore[arg-type]
-    test_ds = SNIPSDataset(snips["test"], vocab=vocab, seq_len=cfg.seq_len)  # type: ignore[arg-type]
+    class_names: list[str] = snips["labels"]  # type: ignore[assignment]
 
-    train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers)
-    val_loader = DataLoader(val_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
-    test_loader = DataLoader(test_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers)
+    # Tokenize SNIPS training texts → used to extend vocab coverage
+    snips_train_tokens: list[list[str]] = [
+        tokenizer.tokenize(ex.text)  # type: ignore[union-attr]
+        for ex in snips["train"]     # type: ignore[union-attr]
+        if ex.text.strip()           # type: ignore[union-attr]
+    ]
 
+    # ── Build or rebuild vocabulary ───────────────────────────────────────────
+    vocab, _, _ = build_or_load_vocab_and_ids(
+        lm_cfg.data_dir,
+        lm_cfg.vocab_size,
+        tokenizer,
+        supplement_texts=snips_train_tokens,
+        force=args.rebuild_vocab,
+    )
+    logger.info("Vocabulary size: %d", len(vocab))
+
+    # ── Datasets & data-loaders ───────────────────────────────────────────────
+    train_ds = SNIPSDataset(snips["train"], vocab=vocab, seq_len=cfg.seq_len)       # type: ignore
+    val_ds   = SNIPSDataset(snips["validation"], vocab=vocab, seq_len=cfg.seq_len)  # type: ignore
+    test_ds  = SNIPSDataset(snips["test"], vocab=vocab, seq_len=cfg.seq_len)        # type: ignore
+
+    train_loader = DataLoader(
+        train_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers
+    )
+    test_loader = DataLoader(
+        test_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers
+    )
+
+    # ── Build backbone and optionally load pretrained weights ─────────────────
     lm = build_backbone(vocab_size=len(vocab), pad_id=vocab.pad_id, lm_cfg=lm_cfg)
+    if args.ckpt_path:
+        load_checkpoint(lm, args.ckpt_path, logger)
+
     model = IntentClassifier(lm=lm, embed_dim=cfg.embed_dim, num_classes=cfg.num_classes)
+
+    # ── Train ─────────────────────────────────────────────────────────────────
     trainer = DownstreamTrainer(
         model=model,
         cfg=cfg,
         run_name=run_name,
         mode=args.mode,
         logger=logger,
-        class_names=class_names,  # type: ignore[arg-type]
+        class_names=class_names,
     )
 
     trainer.train(train_loader, val_loader)
