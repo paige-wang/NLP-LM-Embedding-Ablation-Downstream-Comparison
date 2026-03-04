@@ -55,7 +55,7 @@ class EmbeddingConfig:
     w2v_workers: int = 1
     w2v_save_path: str = "data/processed/word2vec.bin"
 
-    glove_path: str = "data/raw/glove.6B.300d.txt"
+    glove_path: str = ""  # Must be set explicitly via CLI (e.g. data/raw/glove.6B.300d.txt)
 
 
 @dataclass

@@ -34,6 +34,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--max_steps", type=int, default=0)
+    parser.add_argument(
+        "--glove_path",
+        type=str,
+        default="data/raw/glove.6B.300d.txt",
+        help="Path to GloVe embeddings file (used when --embed=fixed_pretrained).",
+    )
     return parser.parse_args()
 
 
@@ -85,7 +91,12 @@ def run_single(
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=cfg.num_workers)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=cfg.num_workers)
 
-    emb_cfg = EmbeddingConfig(embed_type=embed_name, embed_dim=cfg.embed_dim, vocab_size=cfg.vocab_size)
+    emb_cfg = EmbeddingConfig(
+        embed_type=embed_name,
+        embed_dim=cfg.embed_dim,
+        vocab_size=cfg.vocab_size,
+        glove_path=args.glove_path,
+    )
     embedding, meta = build_embedding(emb_cfg, vocab, token_sequences=token_sequences)
     model = make_model(model_name, cfg, len(vocab), embedding, pad_id=vocab.pad_id)
     device = resolve_device(cfg.device)

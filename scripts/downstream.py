@@ -18,6 +18,7 @@ from src.data.downstream_dataset import SNIPSDataset
 from src.data.pipeline import build_or_load_vocab_and_ids, load_snips_splits
 from src.data.tokenizer import SimpleTokenizer
 from src.embeddings.trainable import TrainableEmbedding
+from src.embeddings.fixed_pretrained import FixedPretrainedEmbedding
 from src.downstream.classifier import IntentClassifier
 from src.downstream.trainer import DownstreamTrainer
 from src.models.transformer_lm import TransformerLanguageModel
@@ -52,6 +53,23 @@ def parse_args() -> argparse.Namespace:
             "from WikiText-2 + SNIPS training data.  Use this when the cached "
             "vocab is tiny (e.g. built from the fallback corpus)."
         ),
+    )
+    parser.add_argument(
+        "--embed_init",
+        choices=["random", "glove", "pretrained"],
+        default="random",
+        help=(
+            "Embedding initialization strategy: "
+            "'random' = default random init, "
+            "'glove' = initialize embedding layer from GloVe vectors, "
+            "'pretrained' = load full checkpoint via --ckpt_path (default behavior)."
+        ),
+    )
+    parser.add_argument(
+        "--glove_path",
+        type=str,
+        default="data/raw/glove.6B.300d.txt",
+        help="Path to GloVe embeddings file (used when --embed_init=glove).",
     )
     return parser.parse_args()
 
@@ -124,7 +142,8 @@ def main() -> None:
             cfg.frozen_lr = args.lr
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_name = f"downstream_{args.mode}_{timestamp}"
+    init_tag = args.embed_init if args.embed_init != "random" else ""
+    run_name = f"downstream_{args.mode}{'_' + init_tag if init_tag else ''}_{timestamp}"
     logger = get_logger(run_name, cfg.log_dir)
 
     logger.info(
@@ -174,10 +193,23 @@ def main() -> None:
         test_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=cfg.num_workers
     )
 
-    # ── Build backbone and optionally load pretrained weights ─────────────────
+    # ── Build backbone and apply initialization strategy ────────────────────
     lm = build_backbone(vocab_size=len(vocab), pad_id=vocab.pad_id, lm_cfg=lm_cfg)
-    if args.ckpt_path:
-        load_checkpoint(lm, args.ckpt_path, logger)
+
+    if args.embed_init == "glove":
+        # Initialize only the embedding layer from GloVe; other layers stay random
+        glove_emb, coverage = FixedPretrainedEmbedding.from_glove(
+            vocab=vocab, glove_path=args.glove_path, embed_dim=lm_cfg.embed_dim, pad_id=vocab.pad_id
+        )
+        lm.embedding.embedding.weight.data.copy_(glove_emb.weight.data)
+        logger.info("embed_init=glove  glove_coverage=%.4f", coverage)
+    elif args.embed_init == "pretrained" or args.ckpt_path:
+        if args.ckpt_path:
+            load_checkpoint(lm, args.ckpt_path, logger)
+        else:
+            logger.warning("embed_init=pretrained but no --ckpt_path provided; using random init.")
+    else:
+        logger.info("embed_init=random")
 
     model = IntentClassifier(lm=lm, embed_dim=cfg.embed_dim, num_classes=cfg.num_classes)
 

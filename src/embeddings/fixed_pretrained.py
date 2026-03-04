@@ -36,16 +36,21 @@ class FixedPretrainedEmbedding(BaseEmbedding):
     ) -> tuple["FixedPretrainedEmbedding", float]:
         """Load GloVe vectors and align them to LM vocabulary."""
         path = Path(glove_path)
+        if not path.exists():
+            raise FileNotFoundError(
+                f"GloVe file not found at '{glove_path}'. Download it with:\n"
+                "  wget https://nlp.stanford.edu/data/glove.6B.zip && "
+                "unzip -j glove.6B.zip glove.6B.300d.txt -d data/raw/"
+            )
         glove_map: dict[str, np.ndarray] = {}
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as handle:
-                for line in handle:
-                    parts = line.rstrip().split(" ")
-                    if len(parts) != embed_dim + 1:
-                        continue
-                    token = parts[0]
-                    vector = np.asarray(parts[1:], dtype=np.float32)
-                    glove_map[token] = vector
+        with open(path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                parts = line.rstrip().split(" ")
+                if len(parts) != embed_dim + 1:
+                    continue
+                token = parts[0]
+                vector = np.asarray(parts[1:], dtype=np.float32)
+                glove_map[token] = vector
 
         weight = np.random.randn(len(vocab), embed_dim).astype(np.float32) * 0.01
         hits = 0
