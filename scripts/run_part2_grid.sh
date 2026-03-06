@@ -70,6 +70,7 @@ PY
 
 echo "===================="
 echo "Part II corrected grid rerun"
+echo "runner_version: 2026-03-07-autodl-v2"
 echo "repo: ${REPO_ROOT}"
 echo "python: ${PYTHON_BIN}"
 echo "cuda_visible_devices: ${CUDA_VISIBLE_DEVICES}"

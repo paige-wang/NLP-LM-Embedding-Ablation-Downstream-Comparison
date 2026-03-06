@@ -32,11 +32,19 @@ from src.utils.seed import set_seed
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", choices=["ngram", "rnn", "lstm", "transformer"], required=True)
-    parser.add_argument("--embed", choices=["trainable", "fixed_self", "fixed_pretrained"], default="trainable")
+    parser.add_argument("--embed", dest="embed", choices=["trainable", "fixed_self", "fixed_pretrained"], default="trainable")
+    parser.add_argument(
+        "--embed_type",
+        dest="embed",
+        choices=["trainable", "fixed_self", "fixed_pretrained"],
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--max_steps", type=int, default=0)
     parser.add_argument("--data_dir", type=str, default=None, help="Processed data directory override.")
+    parser.add_argument("--lr", type=float, default=None, help="Learning-rate override.")
+    parser.add_argument("--device", type=str, default=None, help="Device override, e.g. cuda or cpu.")
     parser.add_argument(
         "--glove_path",
         type=str,
@@ -270,6 +278,10 @@ def main() -> None:
         cfg.max_steps_per_epoch = args.max_steps
     if args.data_dir is not None:
         cfg.data_dir = args.data_dir
+    if args.lr is not None:
+        cfg.lr = args.lr
+    if args.device is not None:
+        cfg.device = args.device
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"{args.model}_{args.embed}_{timestamp}"
