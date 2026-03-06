@@ -36,6 +36,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--max_steps", type=int, default=0)
+    parser.add_argument("--data_dir", type=str, default=None, help="Processed data directory override.")
+    parser.add_argument(
+        "--glove_path",
+        type=str,
+        default="data/raw/glove.6B.300d.txt",
+        help="Path to GloVe embeddings file (used when --embed=fixed_pretrained).",
+    )
     return parser.parse_args()
 
 
@@ -117,6 +124,7 @@ def train_neural_model(args: argparse.Namespace, cfg: LMConfig, run_name: str, l
         embed_type=args.embed,
         embed_dim=cfg.embed_dim,
         vocab_size=cfg.vocab_size,
+        glove_path=args.glove_path,
     )
     model, embedding_meta = make_model(args.model, cfg, emb_cfg, vocab, train_token_sequences)
     device = resolve_device(cfg.device)
@@ -260,6 +268,8 @@ def main() -> None:
         cfg.batch_size = args.batch_size
     if args.max_steps:
         cfg.max_steps_per_epoch = args.max_steps
+    if args.data_dir is not None:
+        cfg.data_dir = args.data_dir
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"{args.model}_{args.embed}_{timestamp}"
