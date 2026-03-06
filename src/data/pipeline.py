@@ -13,6 +13,25 @@ from src.data.vocabulary import Vocabulary
 SNIPS_DATA_DIR = Path("data/snips")
 
 
+def _reconstruct_sequences_from_ids(ids: np.ndarray, vocab: Vocabulary) -> list[list[str]]:
+    """Reconstruct token sequences from cached LM ids split by BOS/EOS markers."""
+    sequences: list[list[str]] = []
+    current: list[int] = []
+    for idx in ids.tolist():
+        if idx == vocab.bos_id:
+            current = []
+            continue
+        if idx == vocab.eos_id:
+            if current:
+                sequences.append(vocab.decode_ids(current, skip_special=True))
+            current = []
+            continue
+        current.append(idx)
+    if current:
+        sequences.append(vocab.decode_ids(current, skip_special=True))
+    return [seq for seq in sequences if seq]
+
+
 def _fallback_wikitext() -> dict[str, list[str]]:
     """Provide tiny local fallback corpus when HF download is unavailable."""
     return {
@@ -84,7 +103,8 @@ def build_or_load_vocab_and_ids(
             vocab.build(supplement_texts)
             vocab.save(str(vocab_path))
         split_ids = {name: np.load(path) for name, path in split_paths.items()}
-        return vocab, split_ids, []
+        train_token_sequences = _reconstruct_sequences_from_ids(split_ids["train"], vocab)
+        return vocab, split_ids, train_token_sequences
 
     raw_splits = load_wikitext_splits()
     token_splits: dict[str, list[list[str]]] = {}

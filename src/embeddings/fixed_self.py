@@ -52,14 +52,17 @@ class FixedSelfTrainedEmbedding(BaseEmbedding):
         if KeyedVectors is not None and path.exists():
             kv = KeyedVectors.load(str(path), mmap="r")
         elif Word2Vec is not None:
+            sentences = list(token_sequences)
+            if not sentences:
+                raise ValueError("fixed_self requires non-empty token sequences for Word2Vec training.")
             model = Word2Vec(
-                sentences=list(token_sequences),
                 vector_size=embed_dim,
                 window=window,
                 min_count=min_count,
                 workers=workers,
-                epochs=epochs,
             )
+            model.build_vocab(sentences)
+            model.train(sentences, total_examples=model.corpus_count, epochs=epochs)
             kv = model.wv
             kv.save(str(path))
         else:
