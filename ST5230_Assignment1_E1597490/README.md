@@ -1,93 +1,150 @@
-# ST5230 Assignment 1
+# ST5230 Assignment 1 Submission
 
 Student ID: `E1597490`
 
-This repository contains the code, report source, and final experiment artifacts for ST5230 Assignment 1 on language modeling, embedding ablation, and downstream transfer.
+This folder is the cleaned submission package for `ST5230 Assignment 1`. It contains the final report source, the code used for all experiments, the datasets required to reproduce the runs, and the compact result summaries used in the report.
 
-## Repository Contents
+## What To Submit
 
-- `src/`: model, embedding, data, downstream, and utility modules
-- `scripts/`: runnable entry points for Part I, Part II, Part III, and result summarization
-- `data/`: cached processed LM data and SNIPS splits used in the experiments
-- `final_results_20260305/`: final Part I and Part III artifacts used in the report
-- `part2_results_full_20260307/`: final Part II `3 x 3` budget-controlled rerun artifacts from AutoDL
-- `report_for_overleaf.tex`: final LaTeX source of the report
-- `requirements.md`: original assignment requirements
-- `requirements.txt`: Python dependencies
+The assignment asks for:
 
-## Assignment Coverage
+- a PDF report with a maximum length of 6 pages
+- the code as either a GitHub repository or a zip file
 
-The submission covers all three required parts.
+This folder is prepared for the code submission. The final report source is included as:
+
+- `report_for_overleaf.tex`
+
+The final PDF should be exported from Overleaf and submitted separately.
+
+## What Is Included
+
+- `src/`
+  - implementation of the language models, embedding variants, downstream classifier, and data pipeline
+- `scripts/`
+  - runnable scripts for Part I, Part II, Part III, and Part II summarization
+- `data/`
+  - SNIPS splits and cached WikiText-2 tokenized arrays used in the experiments
+- `final_results_20260305/`
+  - compact final artifacts used for Part I and Part III in the report
+- `part2_results_full_20260307/`
+  - compact summary files for the full Part II `3 x 3` study
+- `requirements.txt`
+  - Python dependency list
+
+## What Is Excluded
+
+To keep the submission package compact and readable, this folder does not duplicate:
+
+- intermediate planning notes
+- AI workflow files
+- large model checkpoints
+- raw server logs that are not needed for grading
+
+The report tables and conclusions are still fully supported by the included summary files.
+
+## Assignment Requirement Coverage
 
 ### Part I: Language Model Training and Comparison
 
-Trained and compared:
+Implemented and trained on the same WikiText-2 corpus:
 
 - `n`-gram LM
 - RNN LM
 - LSTM LM
-- decoder-only Transformer LM
+- Transformer LM
 
-Compared with:
+Compared in the report using:
 
 - validation perplexity
 - training time
 - inference latency
-- generated text samples
+- qualitative generated text samples
+
+Relevant code:
+
+- `scripts/train_lm.py`
+- `src/models/`
+
+Relevant artifacts:
+
+- `final_results_20260305/EXPERIMENTS.md`
+- `final_results_20260305/outputs/figures/`
 
 ### Part II: Embedding Variants and Ablation
 
-Compared three embedding settings in neural LMs:
+Compared three embedding settings in neural language models:
 
 - trainable embeddings learned from scratch
 - fixed self-trained embeddings (`Word2Vec`)
 - fixed pretrained embeddings (`GloVe-6B-300d`)
 
-The final reported Part II matrix is a full `3 x 3` comparison over:
+Compared across three model families:
 
-- architectures: `RNN`, `LSTM`, `Transformer`
-- embeddings: `trainable`, `fixed_self`, `fixed_pretrained`
+- `RNN`
+- `LSTM`
+- `Transformer`
 
-Because the complete grid was run on a rented AutoDL server, the final Part II study is reported as a unified-compute comparison:
+The final reported Part II study is a full `3 x 3` matrix under a unified compute budget:
 
 - `10` epochs
-- at most `400` optimization steps per epoch
+- up to `400` optimization steps per epoch
 - batch size `128`
-- NVIDIA RTX `4090D 24GB`
 
-This design keeps all nine runs directly comparable under limited compute.
+This budget-controlled setting was used so that all nine runs remained directly comparable under limited compute.
 
-### Part III: Downstream Task
+Relevant code:
 
-Built a simple SNIPS intent classifier from Transformer representations:
+- `scripts/run_part2_grid.sh`
+- `scripts/summarize_part2.py`
+- `src/embeddings/`
+
+Relevant artifacts:
+
+- `part2_results_full_20260307/outputs/part2_summary.md`
+- `part2_results_full_20260307/outputs/EXPERIMENTS.md`
+
+### Part III: Downstream Task with Learned Representations
+
+Built a simple intent classifier on SNIPS using Transformer representations:
 
 - last-token pooling
 - single linear classification head
 
-Compared:
+Compared three transfer settings:
 
 - frozen WikiText-pretrained Transformer
 - frozen GloVe-initialized model
-- full fine-tuning
+- fine-tuned WikiText-pretrained Transformer
 
-## Main Final Results
+Relevant code:
+
+- `scripts/downstream.py`
+- `src/downstream/`
+
+Relevant artifacts:
+
+- `final_results_20260305/EXPERIMENTS.md`
+- `final_results_20260305/outputs/figures/`
+
+## Main Results Used In The Report
 
 ### Part I
 
-- Best LM backbone: `Transformer`
-- Best validation perplexity: `17.87`
+- best backbone: `Transformer`
+- best validation perplexity: `17.87`
 
 ### Part II
 
-Final validation perplexity under the unified compute budget:
+Validation perplexity under the unified compute budget:
 
-| Model | Trainable | Fixed Self | GloVe |
+| Model | Trainable | Fixed Self | Fixed Pretrained |
 |---|---:|---:|---:|
 | RNN | 183.27 | **165.95** | 187.01 |
 | LSTM | 336.58 | **304.21** | 403.49 |
 | Transformer | 213.45 | **174.43** | 187.11 |
 
-Additional Part II fact:
+Additional result:
 
 - `glove_coverage = 0.9199`
 
@@ -99,7 +156,7 @@ Additional Part II fact:
 | Frozen GloVe | 95.36 | 95.35 |
 | Fine-tuned WikiText | **97.07** | **97.05** |
 
-## How To Run
+## How To Reproduce
 
 Install dependencies:
 
@@ -107,9 +164,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-### Part I
-
-Train a language model:
+Train the Part I models:
 
 ```bash
 python scripts/train_lm.py --model ngram
@@ -118,73 +173,39 @@ python scripts/train_lm.py --model lstm --embed trainable
 python scripts/train_lm.py --model transformer --embed trainable
 ```
 
-### Part II
-
-Single run:
-
-```bash
-python scripts/train_lm.py --model transformer --embed fixed_self
-python scripts/train_lm.py --model transformer --embed fixed_pretrained --glove_path data/raw/glove.6B.300d.txt
-```
-
-Full grid:
+Run the Part II grid:
 
 ```bash
 bash scripts/run_part2_grid.sh
 python scripts/summarize_part2.py --min_epochs 10
 ```
 
-### Part III
-
-Frozen transfer:
+Run the Part III downstream experiments:
 
 ```bash
 python scripts/downstream.py --mode frozen --embed_init pretrained --ckpt_path <transformer_checkpoint>
 python scripts/downstream.py --mode frozen --embed_init glove --glove_path data/raw/glove.6B.300d.txt
-```
-
-Fine-tuning:
-
-```bash
 python scripts/downstream.py --mode finetune --embed_init pretrained --ckpt_path <transformer_checkpoint>
 ```
 
-## Data Notes
+If `GloVe-6B-300d` is needed, place:
 
-- WikiText-2 and SNIPS are used in this project.
-- `data/snips/` is included.
-- `data/processed/` contains cached token IDs and vocabulary built for the experiments.
-- `data/raw/` is not included; if GloVe is needed, place `glove.6B.300d.txt` at `data/raw/glove.6B.300d.txt`.
-- Additional download details are in `data/README.md`.
+- `glove.6B.300d.txt`
 
-## Final Artifact Locations
+at:
 
-- Report source: `report_for_overleaf.tex`
-- Part I / Part III artifacts: `final_results_20260305/`
-- Part II full server rerun artifacts: `part2_results_full_20260307/`
+- `data/raw/glove.6B.300d.txt`
 
-Important Part II files:
+## Compute Work Completed
 
-- `part2_results_full_20260307/outputs/part2_summary.md`
-- `part2_results_full_20260307/outputs/logs/`
-- `part2_results_full_20260307/outputs/checkpoints/`
+In addition to the local experiments, substantial server-side work was required to complete the final Part II matrix.
 
-## AutoDL Work Log Summary
+Completed work included:
 
-The final Part II matrix was completed on AutoDL with an RTX 4090D 24GB GPU.
+- adapting `scripts/run_part2_grid.sh` for stable CUDA execution on AutoDL
+- making `scripts/train_lm.py` compatible with the required CLI variants
+- fixing the self-trained embedding pipeline so `Word2Vec` explicitly builds vocabulary before training
+- running the full Part II `3 x 3` matrix on an RTX `4090D 24GB` server
+- collecting the result summaries back into this project for reporting
 
-Server-side work included:
-
-- hardening `scripts/run_part2_grid.sh` for CUDA execution and resumable grid runs
-- adding backward-compatible CLI support in `scripts/train_lm.py`
-- fixing `fixed_self` embedding training so `Word2Vec` explicitly builds vocabulary before training
-- rerunning the full Part II `3 x 3` matrix under a controlled compute budget
-- downloading the complete logs, checkpoints, and summaries back into this repository
-
-## Submission Note
-
-For course submission, the final deliverable folder is:
-
-- `ST5230_Assignment1_E1597490/`
-
-It contains the cleaned submission-ready copy of the code, report source, and final experiment artifacts needed for grading, excluding AI planning files and intermediate project-management notes. To avoid duplicating very large binaries, the submission folder keeps the final Part II logs and summary but does not duplicate the full checkpoint archive that is already preserved in the repository root.
+These steps are reflected in the final code under `scripts/` and `src/embeddings/`.
