@@ -1,4 +1,0 @@
-2026-03-01 20:39:16 | INFO | using_seq_len=13
-2026-03-01 20:39:21 | INFO | run=transformer_trainable_20260301_203916 model=transformer embed=trainable params=4351200 device=cpu
-2026-03-01 20:39:21 | INFO | epoch=1 train_loss=3.4037 val_ppl=17.8717 lr=0.000001 time=0.51s effective_batch=8
-2026-03-01 20:39:21 | INFO | checkpoint_saved=outputs\checkpoints\transformer_trainable_20260301_203916\model.pt

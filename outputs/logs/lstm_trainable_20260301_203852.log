@@ -1,4 +1,0 @@
-2026-03-01 20:38:52 | INFO | using_seq_len=13
-2026-03-01 20:38:56 | INFO | run=lstm_trainable_20260301_203852 model=lstm embed=trainable params=3942545 device=cpu
-2026-03-01 20:38:56 | INFO | epoch=1 train_loss=3.2220 val_ppl=25.6687 lr=0.000001 time=0.48s effective_batch=8
-2026-03-01 20:38:56 | INFO | checkpoint_saved=outputs\checkpoints\lstm_trainable_20260301_203852\model.pt

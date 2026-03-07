@@ -1,4 +1,0 @@
-2026-03-01 20:38:27 | INFO | using_seq_len=13
-2026-03-01 20:38:32 | INFO | run=rnn_trainable_20260301_203827 model=rnn embed=trainable params=1116305 device=cpu
-2026-03-01 20:38:32 | INFO | epoch=1 train_loss=3.2323 val_ppl=27.4906 lr=0.000001 time=0.33s effective_batch=8
-2026-03-01 20:38:32 | INFO | checkpoint_saved=outputs\checkpoints\rnn_trainable_20260301_203827\model.pt

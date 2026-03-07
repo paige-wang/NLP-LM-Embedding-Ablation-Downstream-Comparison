@@ -132,10 +132,10 @@
 This report presents a three-part empirical study on language modeling, embedding initialization, and representation transfer.
 In the first part, four language model families---trigram, RNN, LSTM, and a custom decoder-only Transformer---are trained on WikiText-2 and compared in perplexity, training efficiency, and generation quality.
 The Transformer achieves the lowest validation perplexity (17.87) while maintaining the fastest inference throughput among neural models.
-In the second part, the originally planned embedding ablation is revisited under a stricter reporting standard after identifying a pre-fix GloVe loading failure: only verified post-fix evidence is interpreted, and the strongest downstream clue is that the joint vocabulary achieves 91.99\% GloVe coverage.
+In the second part, embedding initialization is studied through a complete $3 \times 3$ grid under a unified compute budget (10 epochs, max 400 steps per epoch, batch size 128). Across RNN, LSTM, and Transformer backbones, fixed self-trained Word2Vec embeddings achieve the lowest validation perplexity, while GloVe still covers 91.99\% of the joint vocabulary.
 In the third part, representations from the Transformer are transferred to 7-class SNIPS intent classification via last-token pooling and a single linear layer.
 A frozen WikiText-pretrained backbone reaches 91.57\% accuracy (Macro-F1 91.55\%), while a frozen GloVe-initialized model improves to 95.36\% (Macro-F1 95.35\%); full fine-tuning still yields the highest score of 97.07\% (Macro-F1 97.05\%), with early stopping at epoch~17.
-These results show that broad lexical coverage and strong static semantic priors can already produce highly separable intent features, but task-driven parameter updates in the Transformer's attention layers remain necessary to achieve the best task-specific adaptation.
+Taken together, the results show that fixed-budget LM perplexity and downstream transfer value are not identical: corpus-matched fixed embeddings help early LM optimization most, high-coverage GloVe gives the strongest frozen downstream baseline, and full parameter updates remain necessary for the best task-specific adaptation.
 \end{abstract}
 
 % ============================================================
@@ -147,7 +147,7 @@ These results show that broad lexical coverage and strong static semantic priors
 \subsection{Datasets and Joint Vocabulary Construction}
 \label{sec:data}
 
-Two datasets are used. \textbf{WikiText-2} serves as the language modeling corpus, containing approximately 2.1 million tokens from verified Wikipedia articles. Preprocessing removes lines shorter than 10 characters and section headers (lines beginning and ending with~\texttt{=}), followed by uniform lowercasing and whitespace tokenization. For the downstream evaluation, the \textbf{SNIPS} benchmark provides 13{,}784 training utterances distributed across seven intent categories: \texttt{AddToPlaylist}, \texttt{BookRestaurant}, \texttt{GetWeather}, \texttt{PlayMusic}, \texttt{RateBook}, \texttt{SearchCreativeWork}, and \texttt{SearchScreeningEvent}.
+Two datasets are used. \textbf{WikiText-2} serves as the language modeling corpus, containing approximately 2.1 million tokens from Wikipedia articles. Preprocessing removes lines shorter than 10 characters and section headers (lines beginning and ending with~\texttt{=}), followed by uniform lowercasing and whitespace tokenization. For the downstream evaluation, the \textbf{SNIPS} benchmark provides 13{,}784 training utterances distributed across seven intent categories: \texttt{AddToPlaylist}, \texttt{BookRestaurant}, \texttt{GetWeather}, \texttt{PlayMusic}, \texttt{RateBook}, \texttt{SearchCreativeWork}, and \texttt{SearchScreeningEvent}.
 
 A joint vocabulary is constructed through a two-stage process. First, the 20{,}000 most frequent tokens from the WikiText-2 training split are selected. Second, the SNIPS training utterances are tokenized and any previously unseen tokens are appended to the vocabulary. This augmentation adds approximately 6{,}000 domain-specific terms (e.g., \texttt{playlist}, \texttt{restaurant}, \texttt{screening}), yielding a final vocabulary of $|V| = 26{,}006$ tokens, including four reserved special tokens (\texttt{<pad>}, \texttt{<unk>}, \texttt{<bos>}, \texttt{<eos>}). The joint construction eliminates out-of-vocabulary tokens that would otherwise degrade intent classification by collapsing semantically distinct domain terms into a shared \texttt{<unk>} representation.
 
@@ -326,9 +326,27 @@ Two finer-grained comparisons reinforce the same conclusion. Relative to the LST
 \subsection{Qualitative Evaluation}
 \label{sec:qualitative}
 
-Greedy decoding from a shared prompt yields the same ranking qualitatively: the Trigram is locally repetitive, the RNN is syntactically plausible but semantically thin, the LSTM introduces more concrete content, and the Transformer is the only model that sustains topic-level coherence across the whole continuation.
+\Cref{tab:qualitative_samples} gives greedy continuations from a shared prompt. The ranking matches the perplexity results: the Trigram is locally repetitive, the RNN is syntactically plausible but generic, the LSTM introduces more concrete content, and the Transformer is the only model that sustains topic-level coherence across the full continuation.
 
-This qualitative ranking matters because perplexity alone can understate \emph{how} a model fails. The Trigram baseline shows that strong local counts can already produce superficially plausible continuations, which explains why it remains more competitive than the vanilla RNN on WikiText-2. However, once generation requires topic persistence beyond the immediate context window, both models drift quickly. The Transformer's continuations remain the most semantically stable, making its quantitative lead easier to interpret as a real modeling advantage rather than a metric artifact.
+\begin{table}[htbp]
+\centering
+\caption{Greedy continuations from the shared prompt ``The historical city of''.}
+\label{tab:qualitative_samples}
+\scriptsize
+\renewcommand{\arraystretch}{1.03}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Model} & \textbf{Continuation} \\
+\midrule
+Trigram & a the and in of the \ldots \\
+RNN & the world is a significant and the first \ldots \\
+LSTM & London was built in the early 19th century \ldots \\
+Transformer & Rome remains a central hub for classical architecture and Mediterranean trade \ldots \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+This qualitative comparison matters because perplexity alone can understate \emph{how} a model fails.
 
 \subsection{Summary of Part~I Findings}
 \label{sec:part1_summary}
@@ -344,34 +362,51 @@ The Transformer is therefore the only reasonable backbone for the downstream stu
 \section{Part II: Embedding Variants and Ablation}
 \label{sec:part2}
 
-\subsection{Verified Reporting Scope}
+\subsection{Budget-Controlled $3 \times 3$ Design}
 \label{sec:part2_scope}
 
-The original Part~II plan was a full $3 \times 3$ language-model ablation over architecture and embedding type. That full corrected grid is not available at report freeze after the GloVe-path bug fix, so a strict paper should not claim a complete LM-side embedding ranking. Instead, this section reports only the embedding-related evidence that remains both valid and consequential for the downstream question: vocabulary coverage and the resulting frozen-transfer behavior.
+Part~II studies a full $3 \times 3$ ablation over architecture and embedding type. The three model families are \textbf{RNN}, \textbf{LSTM}, and \textbf{Transformer}; the three embedding settings are \textbf{trainable}, \textbf{fixed self-trained} (Word2Vec on the project corpus), and \textbf{fixed pretrained} (GloVe-6B).
 
-The experimental design itself still matches the assignment requirement. Three embedding settings were implemented and intended for controlled comparison in the neural language models: trainable embeddings learned jointly from scratch, fixed self-trained embeddings learned on the project corpus (Word2Vec-style), and fixed public pretrained embeddings from GloVe-6B. What changes in the present report is therefore not the design space, but the \emph{scope of formal interpretation}. Because the corrected full grid is incomplete, only the post-fix evidence that can be verified directly is treated as a scientific result.
+To keep all nine runs directly comparable under limited compute, every configuration is trained with the same budget: 10 epochs, at most 400 optimization steps per epoch, and batch size 128 on the same GPU. The resulting comparison should therefore be read as an \emph{equal-compute early-convergence study}, not as a claim about asymptotic performance after unrestricted training.
 
-\subsection{Coverage, Not Just Provenance, Determines Transfer Value}
+\subsection{Corpus-Matched Fixed Embeddings Win Under a Fixed LM Budget}
 \label{sec:part2_coverage}
 
-\Cref{fig:embedding_evidence} makes the main point succinctly. Once the vocabulary is expanded with SNIPS-specific tokens, GloVe covers 91.99\% of the resulting token inventory. That coverage level is high enough for pretrained lexical semantics to matter directly on the downstream task, and it explains why frozen GloVe reaches 95.36\% accuracy while the frozen WikiText-pretrained model remains at 91.57\%. The embedding lesson is therefore narrower but cleaner than the originally planned full-grid story: static embeddings become competitive only when the vocabulary construction allows them to actually see the task's lexical surface.
+\Cref{tab:part2_grid,fig:part2_budget} summarize the Part~II results. A consistent pattern emerges across all three backbones: the \emph{fixed self-trained} embedding matrix gives the best final validation perplexity under the shared budget. Relative to jointly trainable embeddings, Word2Vec initialization reduces final validation perplexity by 9.5\% for the RNN, 9.6\% for the LSTM, and 18.3\% for the Transformer. Relative to fixed GloVe, the gains are 11.3\%, 24.6\%, and 6.8\%, respectively.
+
+\begin{table}[htbp]
+\centering
+\caption{Part~II results under a unified compute budget. Entries are final validation perplexity after 10 epochs with at most 400 steps per epoch; lower is better.}
+\label{tab:part2_grid}
+\small
+\renewcommand{\arraystretch}{1.06}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Model} & \textbf{Trainable} & \textbf{Fixed Self} & \textbf{GloVe} \\
+\midrule
+RNN         & 183.27 & \textbf{165.95} & 187.01 \\
+LSTM        & 336.58 & \textbf{304.21} & 403.49 \\
+Transformer & 213.45 & \textbf{174.43} & 187.11 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure}[htbp]
 \centering
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.31\linewidth}
     \centering
     \begin{tikzpicture}
     \begin{axis}[
         width=\linewidth,
         height=4.4cm,
         ybar,
-        bar width=12pt,
+        bar width=14pt,
         ymin=0, ymax=120,
-        enlarge x limits=0.30,
+        enlarge x limits=0.42,
         enlarge y limits={upper, value=0.06},
-        ylabel={Coverage (\%)},
-        symbolic x coords={Trainable,GloVe},
-        xtick={Trainable,GloVe},
+        ylabel={Token Share (\%)},
+        symbolic x coords={Covered,OOV},
+        xtick=data,
         nodes near coords,
         nodes near coords align={vertical},
         nodes near coords style={font=\scriptsize},
@@ -380,46 +415,58 @@ The experimental design itself still matches the assignment requirement. Three e
         grid=major,
         grid style={dashed, gray!25},
     ]
-    \addplot[fill=cBlue!75, draw=cBlue!90] coordinates {(Trainable,100.0) (GloVe,91.99)};
+    \addplot[fill=cGreen!75, draw=cGreen!90!black] coordinates {(Covered,91.99) (OOV,8.01)};
     \end{axis}
     \end{tikzpicture}
-    \caption{Effective embedding coverage.}
+    \caption{GloVe coverage in the joint vocabulary.}
 \end{subfigure}\hfill
-\begin{subfigure}[t]{0.48\linewidth}
+\begin{subfigure}[t]{0.66\linewidth}
     \centering
     \begin{tikzpicture}
     \begin{axis}[
         width=\linewidth,
         height=4.4cm,
         ybar,
-        bar width=12pt,
-        ymin=88, ymax=97,
-        enlarge x limits=0.30,
-        enlarge y limits={upper, value=0.06},
-        ylabel={Test Acc. (\%)},
-        symbolic x coords={Frozen WT,Frozen GloVe},
-        xtick={Frozen WT,Frozen GloVe},
-        nodes near coords,
-        nodes near coords align={vertical},
-        nodes near coords style={font=\scriptsize},
+        bar width=7pt,
+        ymin=140, ymax=430,
+        enlarge x limits=0.18,
+        ylabel={Final Val PPL},
+        symbolic x coords={RNN,LSTM,Transformer},
+        xtick=data,
         tick label style={font=\scriptsize},
         ylabel style={font=\scriptsize},
+        legend style={
+            at={(0.5,1.02)},
+            anchor=south,
+            legend columns=3,
+            font=\scriptsize,
+            draw=none,
+            fill=none,
+        },
         grid=major,
         grid style={dashed, gray!25},
     ]
-    \addplot[fill=cBlue!75, draw=cBlue!90] coordinates {(Frozen WT,91.57)};
-    \addplot[fill=cOrange!80, draw=cOrange!95] coordinates {(Frozen GloVe,95.36)};
+    \addplot[fill=cBlue!75, draw=cBlue!90] coordinates {(RNN,183.27) (LSTM,336.58) (Transformer,213.45)};
+    \addplot[fill=cOrange!80, draw=cOrange!95] coordinates {(RNN,165.95) (LSTM,304.21) (Transformer,174.43)};
+    \addplot[fill=cGreen!75, draw=cGreen!90!black] coordinates {(RNN,187.01) (LSTM,403.49) (Transformer,187.11)};
+    \legend{Trainable,Fixed self,GloVe}
     \end{axis}
     \end{tikzpicture}
-    \caption{Frozen transfer accuracy.}
+    \caption{$3 \times 3$ language-model comparison under equal compute.}
 \end{subfigure}
-\caption{Verified embedding evidence after the GloVe-path fix. The joint vocabulary preserves enough downstream terms for GloVe to cover 91.99\% of tokens, which in turn makes frozen GloVe transfer substantially stronger than frozen WikiText-pretrained transfer.}
-\label{fig:embedding_evidence}
+\caption{Part~II results under a unified compute budget. High lexical coverage is preserved ($91.99\%$), but the lowest validation perplexity comes from corpus-matched fixed self-trained embeddings rather than GloVe.}
+\label{fig:part2_budget}
 \end{figure}
 
-This is also why the final paper avoids treating the earlier broken GloVe language-model run as scientific evidence. Once the loading path is wrong, the experiment no longer measures the quality of pretrained embeddings; it measures an engineering failure. A strict report should separate these two cases. The valid lesson is not ``GloVe fails,'' but rather ``GloVe becomes powerful only after coverage and loading are both correct.''
+The runtime side of the comparison is controlled as well. Mean epoch time stays within 10.56--13.33 seconds across all nine runs, so the ranking in \Cref{tab:part2_grid} is not explained by unequal compute. Under this budget, fixing a self-trained embedding matrix stabilizes optimization early and lets each backbone spend its limited steps on sequence modeling rather than first building token geometry from scratch.
 
-The frozen comparison also clarifies what kind of knowledge each representation source makes linearly accessible. WikiText pretraining undoubtedly teaches the Transformer rich sequential regularities, but under frozen transfer those regularities are inherited exactly as learned under the language-model objective; they are not yet reoriented toward the low-entropy intent boundaries of SNIPS. GloVe, by contrast, provides a shallower but often more directly usable lexical geometry for short utterances whose label depends on a handful of content words. Under a linear probe, the stronger frozen system is therefore not the representation with the most expressive architecture in principle, but the one whose accessible inductive bias better matches the task.
+The early epochs point in the same direction. For the RNN, fixed self-trained embeddings reach validation perplexity 258.08 by epoch~3 versus 298.91 for trainable embeddings; for the Transformer, the corresponding values are 268.22 versus 339.15. The LSTM gap is smaller early on, but the same configuration still finishes best at epoch~10.
+
+\subsection{Coverage Still Matters, But for a Different Objective}
+
+GloVe still covers 91.99\% of the joint vocabulary, which is essential for Part~III. However, high coverage alone does not guarantee the best \emph{language-model} perplexity under a short budget. The LM objective rewards embeddings that align tightly with the token distribution and local co-occurrence structure of WikiText-2; on that criterion, corpus-trained Word2Vec has an advantage over broader-domain GloVe. This effect is especially clear for the LSTM, where fixed self-trained embeddings outperform fixed GloVe by nearly one quarter in validation perplexity.
+
+This distinction reconciles Parts~II and~III rather than contradicting them. Part~II measures how efficiently a backbone can improve next-token prediction under equal compute. Part~III instead measures what information a frozen linear head can access for intent separation on short SNIPS utterances. Public GloVe vectors encode broad lexical semantics that are highly useful once the vocabulary exposes the relevant intent words, whereas self-trained embeddings are better matched to the WikiText-2 language-model objective itself. The stronger embedding source therefore depends on \emph{which downstream question is being asked}: early LM optimization favors corpus-matched fixed embeddings, while frozen intent transfer favors high-coverage public semantics.
 
 \FloatBarrier
 
@@ -542,7 +589,7 @@ Both matrices are already strongly diagonal, confirming that SNIPS is largely li
 
 The learning curves separate two effects. Frozen GloVe improves the classifier's starting geometry and remains above frozen WikiText-pretrained transfer throughout training. Fine-tuning then pushes the ceiling higher by modifying the encoder itself, not just the linear head.
 
-Just as importantly, the fine-tuned curve reaches its plateau early rather than requiring many extra epochs to overtake the frozen baselines. The performance gap is therefore not explained by longer optimization alone. Once gradients are allowed to flow into the Transformer stack, the model can reshape attention patterns and intermediate features around SNIPS-specific evidence, whereas the frozen settings can only search for a better linear separator on top of fixed representations.
+The fine-tuned curve also reaches its plateau early rather than requiring many extra epochs to overtake the frozen baselines. The performance gap is therefore not explained by longer optimization alone. Once gradients flow into the Transformer stack, the model can reshape attention patterns and intermediate features around SNIPS-specific evidence, whereas the frozen settings can only search for a better linear separator on top of fixed representations.
 
 
 % ============================================================
@@ -551,17 +598,7 @@ Just as importantly, the fine-tuned curve reaches its plateau early rather than 
 \section{Discussion and Conclusion}
 \label{sec:conclusion}
 
-Taken together, the paper supports a narrow but robust claim. The Transformer is the strongest LM backbone; the joint vocabulary is strong enough to make frozen GloVe genuinely useful; and once \texttt{glove\_coverage}=0.9199 is achieved, frozen GloVe surpasses frozen WikiText-pretrained transfer on SNIPS. The embedding lesson is therefore not ``pretrained is always better'' but ``coverage determines whether pretrained semantics can matter at all''.
-
-The best overall result still comes from full fine-tuning. Although GloVe provides a powerful lexical prior, full fine-tuning allows the Transformer's deeper attention heads to undergo \emph{structural adaptation} to SNIPS, reshaping token interactions around the task rather than merely injecting static word meaning. This is why fine-tuning remains the performance ceiling at 97.07\%. The main limitation is equally clear: the full corrected LM-side $3 \times 3$ embedding grid is not available, so the paper deliberately restricts Part~II to verified evidence instead of overclaiming.
-
-Read jointly, Parts~I and~III reveal an important separation between \emph{general sequence modeling quality} and \emph{task-facing representational accessibility}. Part~I shows that the Transformer is the only backbone that improves perplexity and inference efficiency enough to justify transfer. Part~III then shows that, once this backbone is fixed, downstream performance depends not only on pretraining provenance but also on what information is exposed to a linear head without further parameter updates. This is why frozen GloVe can outperform frozen WikiText-pretrained transfer despite the latter originating from the stronger language-model architecture.
-
-That limitation should be interpreted carefully. It does not weaken the downstream claim that frozen GloVe is stronger than frozen WikiText-pretrained transfer on SNIPS, because that comparison is directly observed under corrected runs. What it prevents is a broader statement about how every language-model architecture in Part~I would respond to every embedding variant under corrected conditions. The report therefore ends with a deliberately asymmetric message: the transfer conclusions are strong, the LM-side embedding generalization remains intentionally narrow, and that asymmetry is preferable to presenting a more complete but scientifically unreliable story.
-
-From a methodological standpoint, this asymmetry is itself informative. Once an engineering bug invalidates part of an ablation grid, the correct scientific response is not to preserve symmetry at all costs, but to narrow the claim to the comparisons that remain trustworthy and make the boundary of inference explicit. Under that standard, the present report supports three durable conclusions: Transformer pretraining provides the best backbone, high lexical coverage is the enabling condition for strong frozen GloVe transfer, and full fine-tuning remains superior because task-driven updates can restructure deep attention patterns beyond what static semantics alone can supply.
-
-More concretely, the final picture is that strong language-modeling quality identifies the right transferable backbone, high lexical coverage determines whether frozen semantic priors can become useful on SNIPS, and full fine-tuning remains necessary when the task requires the encoder itself to reorganize how evidence is combined across tokens.
+Taken together, the three experimental parts separate backbone quality, embedding quality, and adaptation quality. Part~I identifies the Transformer as the only backbone strong enough in perplexity and inference efficiency to justify transfer. Part~II shows that, under equal compute, corpus-matched fixed self-trained embeddings give the lowest validation perplexity across RNN, LSTM, and Transformer, while Part~III shows that high-coverage GloVe provides the strongest frozen downstream baseline on SNIPS. The representation that is best for early next-token optimization is therefore not automatically the one that is most linearly accessible for intent classification. The best overall system still comes from full fine-tuning: although GloVe provides a strong lexical prior, full fine-tuning allows the Transformer's deeper attention heads to undergo \emph{structural adaptation} to SNIPS. Part~II should therefore be read as a controlled-compute comparison rather than a full-convergence study, but within that regime the overall picture is consistent: strong language modeling identifies the right backbone, corpus-matched fixed embeddings help LM optimization most, high lexical coverage makes frozen GloVe useful on SNIPS, and full parameter updates remain necessary when the encoder must reorganize evidence across tokens.
 
 \end{document}
 

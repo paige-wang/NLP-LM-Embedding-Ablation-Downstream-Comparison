@@ -25,8 +25,12 @@ Thumbs.db
 # Claude Code session files
 .claude/
 
-# Large binary outputs (keep figures & logs but not checkpoints)
+# Large experiment artifacts
 outputs/checkpoints/
+**/outputs/checkpoints/
+**/outputs/logs/
+deliverables/
+*.tar.gz
 
 # Jupyter
 .ipynb_checkpoints/
