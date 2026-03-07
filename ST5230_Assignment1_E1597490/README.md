@@ -36,8 +36,6 @@ The final PDF should be exported from Overleaf and submitted separately.
 
 To keep the submission package compact and readable, this folder does not duplicate:
 
-- intermediate planning notes
-- AI workflow files
 - large model checkpoints
 - raw server logs that are not needed for grading
 
